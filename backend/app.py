@@ -1,6 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+import json
+#import numpy as np
+#from matplotlib import colors, colormaps, cm
+#import serial
 import time
 import threading
 import random
