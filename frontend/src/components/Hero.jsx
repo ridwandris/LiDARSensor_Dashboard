@@ -1,5 +1,6 @@
-import RPLiDAR from '../assets/RPLiDAR.mp4';
-import DOBOT400 from '../assets/DOBOT400.mp4';
+import { Link } from "react-router-dom";
+import LidarA1 from '../assets/LidarA1.mp4';
+import Dobot from '../assets/Dobot.mp4';
 
 const Hero = () => {
   return (
@@ -12,49 +13,51 @@ const Hero = () => {
         </span>
       </h1>
       <p className="mt-10 text-lg text-center text-neutral-500 max-w-4xl">
-        The Safety Sensor Project is a web-interface that allows you to monitor the real-time sensor data from a Human Safety Robot Sensor.
+        The Safety Sensor Project is a web-interface that allows you to monitor the real-time sensor data from a Human Safety Robot Sensor. 
+        On the Left hand side is DOBOT MG400, the Robot used. On the right hand side is RPLiDAR A1, the sensor used.
       </p>
       
       <div className="flex justify-center my-10">
-      <a
-          href="#"
-          className="bg-gradient-to-r from-green-500 to-green-800 py-3 px-4 mx-3 rounded-md"
-        >
+        <Link to="/3d-visualization" className="bg-gradient-to-r from-green-500 to-green-800 py-3 px-4 mx-3 rounded-md">
           3D Visualization
-        </a>
-
-        <a
-          href="#"
-          className="bg-gradient-to-r from-green-500 to-green-800 py-3 px-4 mx-3 rounded-md"
-        >
+        </Link>
+        <Link to="/graph-visualization" className="bg-gradient-to-r from-green-500 to-green-800 py-3 px-4 mx-3 rounded-md">
           Graph Visualization
-        </a>
-        
+        </Link>
       </div>
 
       <div className="flex mt-10 justify-center">
-        <video
-          autoPlay
-          loop
-          muted
-          className="rounded-lg w-1/2 border border-green-700 shadow-sm shadow-green-400 mx-2 my-4"
-        >
-          <source src={DOBOT400} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        <video
-          autoPlay
-          loop
-          muted
-          className="rounded-lg w-1/2 border border-green-700 shadow-sm shadow-green-400 mx-2 my-4"
-        >
-          <source src={RPLiDAR} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        <div className="relative w-1/2 mx-2 my-4 aspect-w-16 aspect-h-9">
+          <video
+            autoPlay
+            loop
+            muted
+            className="rounded-lg border border-green-500 shadow-sm shadow-green-400 w-full h-full object-cover"
+          >
+            <source src={Dobot} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 text-white text-center py-2">
+            ROBOT: DOBOT MG400
+          </div>
+        </div>
+        <div className="relative w-1/2 mx-2 my-4 aspect-w-16 aspect-h-9">
+          <video
+            autoPlay
+            loop
+            muted
+            className="rounded-lg border border-green-700 shadow-sm shadow-green-400 w-full h-full object-cover"
+          >
+            <source src={LidarA1} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 text-white text-center py-2">
+            SENSOR: RPLiDAR A1
+          </div>
+        </div>
       </div>
-
     </div>
-  )
-}
+  );
+};
 
-export default Hero
+export default Hero;

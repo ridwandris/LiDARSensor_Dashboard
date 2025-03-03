@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import logo from "../assets/logo.png";
+import githubLogo from "../assets/github.png"; // Import the GitHub logo
 import './Navbar.css'; // Import the CSS file for the animation
 
 const Navbar = () => {
@@ -12,15 +14,16 @@ const Navbar = () => {
           </div>
           
           <div className="hidden lg:flex justify-center space-x-12 items-center">
-            <a href="#" className="py-2 px-3 border rounded-md">
+            <a href="https://github.com/ridwandris/LiDARSensor_Dashboard" className="py-2 px-3 border rounded-md flex items-center" target="_blank" rel="noopener noreferrer">
+              <img src={githubLogo} alt="GitHub Logo" className="h-5 w-5 mr-2" />
               Github Repo
             </a>
-            <a
-              href="#"
+            <Link
+              to="/documentation"
               className="bg-gradient-to-r from-green-500 to-green-800 py-2 px-3 rounded-md"
             >
-              See Docmentation
-            </a>
+              Documentation
+            </Link>
           </div>
         </div>
       </div>
