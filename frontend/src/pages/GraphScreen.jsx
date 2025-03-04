@@ -12,7 +12,7 @@ const GraphScreen = () => {
   useEffect(() => {
     const fetchRobotStatus = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/robot_status");
+        const response = await axios.get("http://165.227.173.155/api/robot_status");
         setRobotStatus(response.data);
       } catch (error) {
         console.error("Error fetching robot status:", error);
@@ -21,7 +21,7 @@ const GraphScreen = () => {
 
     const fetchLidarData = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/lidar_data");
+        const response = await axios.get("http://165.227.173.155/api/lidar_data");
         setLidarData(response.data);
       } catch (error) {
         console.error("Error fetching lidar data:", error);
