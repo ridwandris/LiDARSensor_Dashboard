@@ -12,7 +12,7 @@ const GraphScreen = () => {
   useEffect(() => {
     const fetchRobotStatus = async () => {
       try {
-        const response = await axios.get("http://165.227.173.155/api/robot_status");
+        const response = await axios.get("http://localhost:5000/api/robot_status");
         setRobotStatus(response.data);
       } catch (error) {
         console.error("Error fetching robot status:", error);
@@ -21,7 +21,7 @@ const GraphScreen = () => {
 
     const fetchLidarData = async () => {
       try {
-        const response = await axios.get("http://165.227.173.155/api/lidar_data");
+        const response = await axios.get("http://localhost:5000/api/lidar_data");
         setLidarData(response.data);
       } catch (error) {
         console.error("Error fetching lidar data:", error);
@@ -117,7 +117,7 @@ const GraphScreen = () => {
     <div className="flex flex-col items-center mt-6 lg:mt-20">
       <h1 className="text-4xl sm:text-6xl lg:text-7xl text-center tracking-wide">
         <span className="bg-gradient-to-r from-green-500 to-green-800 text-transparent bg-clip-text">
-          Sensor Data
+         Robot and Sensor Data
         </span>
       </h1>
       {renderRobotStatusCharts()}
