@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import logo from "../assets/logo.png";
-import githubLogo from "../assets/github.png"; // Import the GitHub logo
-import './Navbar.css'; // Import the CSS file for the animation
+import githubLogo from "../assets/github.png";
+import './Navbar.css';
 
 const Navbar = () => {
   return (

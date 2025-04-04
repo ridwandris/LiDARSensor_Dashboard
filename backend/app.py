@@ -1,125 +1,131 @@
-from flask import Flask, jsonify, render_template
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit
-from rplidar import RPLidar, RPLidarException
-from matplotlib import colors, colormaps, cm
-import numpy as np
-import random
+import csv
+import os
+import serial
 import time
-import threading
-# import os
+from flask import Flask, Response, send_file
+import math
+from flask_cors import CORS
+
+# COM Port and baud rate settings for the RPLidar A1 M8 Lidar
+PORT = 'COM5' # Adjust this to your Lidar's COM port. '/dev/ttyUSB0' For Linux or MacOS
+BAUD_RATE = 115200
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-#SERIAL_PORT = 'COM8'
-#BAUDRATE = 115200
-#TIMEOUT: int = 1
+# Initialize serial connection
+ser = None
+try:
+    ser = serial.Serial(PORT, BAUD_RATE, timeout=1, dsrdtr=False)
+    ser.dtr = False  # this disables the DTR signal of the lidar. This will avoid the Lidar motor from stopping the spinning . Gave me some issues at the beginning.
+    time.sleep(2)
 
-#lidar = RPLidar(SERIAL_PORT, baudrate=BAUDRATE)
-#lidar_data = []
+    print("✅ Successfully connected to the Lidar.")
 
-latest_robot_status = {}  # Global variable to store the latest robot status
-latest_lidar_data = {}  # Global variable to store the latest lidar data
+    # Send start scan command
+    ser.write(b'\xA5\x20')
+    time.sleep(0.5)  # Give Lidar time to start spinning
+    print("✅ Lidar is now streaming data. Press Ctrl+C to stop.")
 
-# frontend_folder = os.path.join(os.path.getcwd(), "..", "frontend", "dist")
+except serial.SerialException as e:
+    print(f"❌ Failed to connect to the Lidar: {e}")
+    ser = None
 
-#@app.route('/')
-#def home():
-#    return "Hello, Flask!"
+# File paths for CSV files that will be created for storing stream data that I used for testing purpose in the frontend. its actually dinamic and will be created when the app is running.
+DATA_CSV_FILE = "data.csv"
+Q_DISTANCE_ANGLE_CSV_FILE = "q_distance_angle.csv"
 
-@app.route('/')
-def index():
-    return "LiDAR Flask Backend Running!"
+# Check if the CSV files already exist, if not, they will be created
+if not os.path.exists(DATA_CSV_FILE):
+    with open(DATA_CSV_FILE, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Frame", "X", "Y", "Z"])  # Header for /data
 
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    data = {
-        "message": "Hello from Flask!",
-        "Grusse": "Hallo aus Flask!"
-    }
-    return jsonify(data)
+if not os.path.exists(Q_DISTANCE_ANGLE_CSV_FILE):
+    with open(Q_DISTANCE_ANGLE_CSV_FILE, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Quality", "Angle", "Distance"])  # Header for /q_distance_angle
 
-@app.route('/api/robot_status', methods=['GET'])
-def get_robot_status():
-    return jsonify(latest_robot_status)
+# Flask route to stream live LIDAR data and write to CSV
+@app.route('/data', methods=['GET'])
+def get_live_data():
+    if ser is None or not ser.is_open:
+        return Response("Error: Serial port is not open.", status=500)
 
-@app.route('/api/lidar_data', methods=['GET'])
-def get_lidar_data():
-    return jsonify(latest_lidar_data)
+    def generate():
+        frame_number = 0
+        while True:
+            frame_number += 1
+            data_chunk = ser.read(5)  # Read 5 bytes at a time
 
-lidar_data = []  # Global variable to store the lidar data
+            if len(data_chunk) == 5:
+                # Decode the data chunk
+                quality = data_chunk[0] >> 2
+                check_bit = data_chunk[0] & 0b01
+                angle = ((data_chunk[1] >> 1) | (data_chunk[2] << 7)) / 64.0
+                distance = ((data_chunk[3]) | (data_chunk[4] << 8)) / 4.0
 
-def fetch_lidar_data():
-    global lidar_data
-    try:
-        print('Starting Lidar Scanning...')
-        for scan in lidar.iter_scans():
-            lidar_data = [
-                {"angle": measurement[1], "distance": measurement[2]}
-                for measurement in scan
-            ]
-            socketio.emit('lidar_data', lidar_data)  # Emit data to frontend
-            time.sleep(0.1) 
-    except Exception as e:
-        print(f"Error fetching Lidar data: {e}")
-    finally:
-        lidar.stop()
-        lidar.disconnect()
+                if check_bit == 1 and distance > 0:
+                    # Convert polar coordinates to Cartesian (XYZ)
+                    x = distance * math.cos(math.radians(angle))
+                    y = distance * math.sin(math.radians(angle))
+                    z = 0  # Assuming a 2D plane for LIDAR data
 
-# Start Lidar data fetching in a separate thread
-threading.Thread(target=fetch_lidar_data, daemon=True).start()
+                    # Write to CSV
+                    with open(DATA_CSV_FILE, mode="a", newline="") as file:
+                        writer = csv.writer(file)
+                        writer.writerow([frame_number, x, y, z])
 
-@app.route('/api/rplidar_sim', methods=['GET'])
-def get_rplidar_sim():
-    global lidar_data
-    return jsonify(lidar_data)
+                    # Stream the data as JSON when we run ip localhost:5000/data in the browser
+                    yield f'data: {{"Frame": {frame_number}, "X": {x:.2f}, "Y": {y:.2f}, "Z": {z:.2f}}}\n\n'
 
+            time.sleep(0.01)  # Simulate real-time streaming
 
-def simulate_robot_status():
-    global latest_robot_status
-    while True:
-        try:
-            robot_status = {
-                "position": {
-                    "x": random.uniform(0, 100),
-                    "y": random.uniform(0, 100),
-                    "z": random.uniform(0, 100)
-                },
-                "joint_angles": {
-                    "joint1": random.uniform(0, 180),
-                    "joint2": random.uniform(0, 180),
-                    "joint3": random.uniform(0, 180),
-                    "joint4": random.uniform(0, 180)
-                },
-                "speed": random.uniform(0, 10),
-                "movement_status": random.choice(["idle", "running", "error"]),
-                "safety_zone": random.choice(["green", "yellow", "red"])
-            }
-            latest_robot_status = robot_status  # Update the global variable
-            socketio.emit('robot_status', robot_status, namespace='/')
-        except Exception as e:
-            print(f"Error in simulate_robot_status: {e}")
-        time.sleep(1)
+    return Response(generate(), content_type='text/event-stream')
 
-def simulate_lidar_data():
-    global latest_lidar_data
-    while True:
-        try:
-            lidar_data = {
-                "distances": [random.uniform(0, 100) for _ in range(360)],
-                "safety_zones": ["green" if d > 70 else "yellow" if d > 30 else "red" for d in range(360)]
-            }
-            latest_lidar_data = lidar_data  # Update the global variable
-            socketio.emit('lidar_data', lidar_data, namespace='/')
-        except Exception as e:
-            print(f"Error in simulate_lidar_data: {e}")
-        time.sleep(1)
+# Flask route to stream Q (Quality), Distance, and Angle data and write to CSV
+@app.route('/q_distance_angle', methods=['GET'])
+def get_q_distance_angle():
+    def generate():
+        while True:
+            data_chunk = ser.read(5)  # Read 5 bytes at a time
+
+            if len(data_chunk) == 5:
+                # Decode the data chunk
+                quality = data_chunk[0] >> 2
+                check_bit = data_chunk[0] & 0b01
+                angle = ((data_chunk[1] >> 1) | (data_chunk[2] << 7)) / 64.0
+                distance = ((data_chunk[3]) | (data_chunk[4] << 8)) / 4.0
+
+                if check_bit == 1 and distance > 0:
+                    # Write to CSV
+                    with open(Q_DISTANCE_ANGLE_CSV_FILE, mode="a", newline="") as file:
+                        writer = csv.writer(file)
+                        writer.writerow([quality, angle, distance])
+
+                    # Format the data as requested
+                    formatted_data = f"Q: {quality:<3} | Theta: {angle:>6.2f}° | Dist: {distance:>7.2f} mm\n"
+                    yield formatted_data
+
+            time.sleep(0.01)  # Simulate real-time streaming
+
+    return Response(generate(), content_type='text/plain')
+
+@app.route('/q_distance_angle_csv', methods=['GET'])
+def get_q_distance_angle_csv():
+    return send_file("q_distance_angle.csv", as_attachment=False)
+
+@app.route('/data_csv', methods=['GET'])
+def get_data_csv():
+    return send_file("data.csv", as_attachment=False)
 
 if __name__ == '__main__':
-    print("Starting Lidar Scanning...")
-    threading.Thread(target=fetch_lidar_data).start()
-    threading.Thread(target=simulate_robot_status).start()
-    threading.Thread(target=simulate_lidar_data).start()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    try:
+        # Run the Flask app
+        app.run(host='0.0.0.0', port=5000)
+    finally:
+        # Properly stop the Lidar motor and close the serial connection
+        if ser and ser.is_open:
+            ser.write(b'\xA5\x25')  # Stop the Lidar motor
+            ser.close()
+            print("✅ Serial port closed.")

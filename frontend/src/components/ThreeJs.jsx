@@ -2,13 +2,15 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { fetchLidarData } from '../utils/fetchLidarData';
-import eyesNasaTexture from '../assets/eyes_nasa.png'; // Import the texture
+import eyesNasaTexture from '../assets/eyes_nasa.png'; // Import the texture for the points, i got this from the NASA Eyes on the Solar System website
 
 const ThreeJs = () => {
   const mountRef = useRef(null);
 
   useEffect(() => {
     const mount = mountRef.current;
+
+    // Create the scene, camera, and renderer
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -28,24 +30,59 @@ const ThreeJs = () => {
     pointLight.position.set(10, 10, 10);
     scene.add(pointLight);
 
-    // Add a grid helper
+   // Add a grid helper for reference
     const gridHelper = new THREE.GridHelper(100, 100);
     scene.add(gridHelper);
 
+    // Create points geometry and material
     const geometry = new THREE.BufferGeometry();
     const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(eyesNasaTexture); // Load the texture from the imported path
-    const material = new THREE.PointsMaterial({ map: texture, size: 0.5, transparent: true });
+    const texture = textureLoader.load(eyesNasaTexture); // Load the texture
+    const material = new THREE.PointsMaterial({
+      map: texture,
+      size: 5, // Increase the size of the points
+      transparent: true,
+      depthWrite: false,
+      color: 0x00aaff, // Apply a unifying blue color
+    });
+
+    // Create the points object
     const points = new THREE.Points(geometry, material);
     scene.add(points);
 
-    const lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
-    const lineGeometry = new THREE.BufferGeometry();
-    const line = new THREE.Line(lineGeometry, lineMaterial);
-    scene.add(line);
+    // Set the camera position
+    camera.position.set(0, 0, 150); // Move the camera further back
 
-    camera.position.set(0, 0, 10);
+    // Fetch and render LiDAR data
+    const renderLidarData = async () => {
+      const data = await fetchLidarData();
+      console.log('Fetched LiDAR data:', data); // Debugging: Log fetched data
+      if (data.distances && data.angles) {
+        const positions = new Float32Array(data.distances.length * 3);
 
+        data.distances.forEach((distance, index) => {
+          const angle = data.angles[index] * (Math.PI / 180); // Convert to radians
+          const x = distance * Math.cos(angle);
+          const y = distance * Math.sin(angle);
+          const z = 0; // Assuming 2D data, set z to 0
+
+          // Set position
+          positions[index * 3] = x;
+          positions[index * 3 + 1] = y;
+          positions[index * 3 + 2] = z;
+        });
+
+        // Update the geometry with the new positions
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.attributes.position.needsUpdate = true;
+      } else {
+        console.error('Invalid data:', data);
+      }
+    };
+
+    renderLidarData(); // Fetch and render the data
+
+    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
       controls.update();
@@ -53,46 +90,8 @@ const ThreeJs = () => {
     };
     animate();
 
-    const updateLidarData = async () => {
-      const data = await fetchLidarData();
-      console.log('Fetched LiDAR data:', data); // Debugging: Log fetched data
-      if (data.distances && data.distances.length > 0) {
-        const positions = new Float32Array(data.distances.length * 3);
-        const colors = new Float32Array(data.distances.length * 3);
-        data.distances.forEach((distance, index) => {
-          const angle = (index * Math.PI * 2) / data.distances.length;
-          positions[index * 3] = distance * Math.cos(angle);
-          positions[index * 3 + 1] = distance * Math.sin(angle);
-          positions[index * 3 + 2] = 0; // Assuming 2D data, set z to 0
-
-          // Set color based on safety zone
-          const safetyZone = data.safety_zones[index];
-          let color;
-          if (safetyZone === 'green') {
-            color = new THREE.Color(0x00ff00); // Green
-          } else if (safetyZone === 'yellow') {
-            color = new THREE.Color(0xffff00); // Yellow
-          } else {
-            color = new THREE.Color(0xff0000); // Red
-          }
-          colors[index * 3] = color.r;
-          colors[index * 3 + 1] = color.g;
-          colors[index * 3 + 2] = color.b;
-        });
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        lineGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      } else {
-        console.error('Invalid data:', data);
-      }
-    };
-
-    updateLidarData();
-    const interval = setInterval(updateLidarData, 1000); // Update every second
-
+    // Cleanup on component unmount
     return () => {
-      clearInterval(interval);
       mount.removeChild(renderer.domElement);
     };
   }, []);
